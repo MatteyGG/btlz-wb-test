@@ -22,6 +22,28 @@ const envSchema = z.object({
             .transform((value) => parseInt(value)),
     ]),
     WB_API_TOKEN: z.string().nonempty(),
+    GSHEET_SORT_KEY: z
+    .string()
+    .nonempty()
+    .refine((val) => {
+      const allowed = [
+        "boxDeliveryCoefExpr",
+        "boxDeliveryBase",
+        "boxDeliveryLiter",
+        "boxDeliveryMarketplaceCoefExpr",
+        "boxDeliveryMarketplaceBase",
+        "boxDeliveryMarketplaceLiter",
+        "boxStorageCoefExpr",
+        "boxStorageBase",
+        "boxStorageLiter",
+        "date",
+        "warehouseName",
+        "geoName"
+      ] as const;
+      return allowed.includes(val as any);
+    }, {
+      message: "GSHEET_SORT_KEY must be one of the allowed Warehouse keys"
+    })
 });
 
 const env = envSchema.parse({
@@ -33,6 +55,7 @@ const env = envSchema.parse({
     NODE_ENV: process.env.NODE_ENV,
     APP_PORT: process.env.APP_PORT,
     WB_API_TOKEN: process.env.WB_API_TOKEN,
+    GSHEET_SORT_KEY: process.env.GSHEET_SORT_KEY
 });
 
 export default env;

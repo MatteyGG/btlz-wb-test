@@ -3,7 +3,7 @@ import { GsheetsApiService } from "./api/gsheets-api.service.js";
 import { WbApiService } from "./api/wb-api.service.js";
 import { WarehouseStorageService } from "./storage/warehouse.database.service.js";
 
-//Координирует процессы
+//Координирует сервисы
 export class TariffsModule {
   private wbApiService: WbApiService;
   private warehouseStorage: WarehouseStorageService;
@@ -15,7 +15,9 @@ export class TariffsModule {
     this.gsheetsApiService = new GsheetsApiService();
   }
 
-  async get_and_update_tariffs(): Promise<{ success: boolean; message: string }> {
+
+  //TODO: Выделить обновление google sheets в отдельный процесс.
+  async get_and_update_database(): Promise<{ success: boolean; message: string }> {
     
     // Забираем тарифы с api WB
     const rawApiResponse = await this.wbApiService.fetchTariffs(Date.now);

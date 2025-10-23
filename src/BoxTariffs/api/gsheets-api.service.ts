@@ -1,13 +1,22 @@
 import { Warehouse } from '#BoxTariffs/types/types.js';
+import env from '#config/env/env.js';
 import { GoogleAuth } from 'google-auth-library';
 import { JSONClient } from 'google-auth-library/build/src/auth/googleauth.js';
 import { google, sheets_v4 } from 'googleapis';
 
+const SORT_KEY = 'boxDeliveryCoefExpr' satisfies keyof Warehouse;
+
+/**
+ * Сервис для взаимодействия с Google Sheets API: авторизуется с сервисным аккаунтом и обновляет таблицы тарифов.
+ * @remarks Использует переменные окружения `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY` и `GSHEETS_IDS`.
+ */
 export class GsheetsApiService {
   private sheetsClient: sheets_v4.Sheets | null = null;
 
   private async getClient(): Promise<sheets_v4.Sheets> {
-    if (this.sheetsClient) return this.sheetsClient;
+    if (this.sheetsClient) {
+      return this.sheetsClient;
+    }
 
     const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
     let privateKey = process.env.GOOGLE_PRIVATE_KEY;
@@ -16,7 +25,7 @@ export class GsheetsApiService {
       throw new Error('Missing GOOGLE_CLIENT_EMAIL or GOOGLE_PRIVATE_KEY in environment');
     }
 
-    // Поддержка base64-ключа
+    // Поддержка base64-формата ключа
     try {
       if (/^[A-Za-z0-9+/=]+\s*$/.test(privateKey) && !privateKey.includes('BEGIN PRIVATE KEY')) {
         const decoded = Buffer.from(privateKey, 'base64').toString('utf8');
@@ -29,7 +38,7 @@ export class GsheetsApiService {
     }
     privateKey = privateKey.replace(/\\n/g, '\n');
 
-    const auth = new google.auth.GoogleAuth({
+    const auth = new GoogleAuth({
       credentials: {
         client_email: clientEmail,
         private_key: privateKey,
@@ -37,7 +46,6 @@ export class GsheetsApiService {
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
 
-    // Проверка успешной аутентификации
     await this.verifyAuth(auth);
 
     this.sheetsClient = google.sheets({ version: 'v4', auth });
@@ -51,7 +59,6 @@ export class GsheetsApiService {
       if (!tokenInfo || !tokenInfo.token) {
         throw new Error('Failed to obtain access token');
       }
-      // Выводим лог, что аутентификация прошла
       console.info('Google Sheets API auth successful');
     } catch (err) {
       throw new Error(`Google authentication failed: ${(err as Error).message}`);
@@ -69,7 +76,7 @@ export class GsheetsApiService {
 
   /**
    * Обновляет одну или несколько таблиц (IDs из GSHEETS_IDS).
-   * Данные сортируются по boxDeliveryCoefExpr по возрастанию и пишутся
+   * Данные сортируются по ключу из окружения и пишутся
    * в лист `stocks_coefs`, начиная с A1, включая заголовок.
    */
   async update_gsheets_from_database(warehouses: Warehouse[]): Promise<void> {
@@ -86,7 +93,18 @@ export class GsheetsApiService {
       return;
     }
 
-    const sorted = [...warehouses].sort((a, b) => a.boxDeliveryCoefExpr - b.boxDeliveryCoefExpr);
+    // Используем ключ сортировки из env
+    const sortKey = env.GSHEET_SORT_KEY as keyof Warehouse;
+
+    const sorted = [...warehouses].sort((a, b) => {
+      const aVal = a[sortKey];
+      const bVal = b[sortKey];
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return aVal - bVal;
+      }
+      // если не число — просто вернуть 0 (нет изменений порядка)
+      return 0;
+    });
 
     const header = [
       'Дата (YYYY-MM-DD:HH) snapshot',
@@ -121,13 +139,53 @@ export class GsheetsApiService {
     const values = [header as unknown as string[], ...rows];
 
     for (const id of spreadsheetIds) {
-      console.info(`Updating sheet ${id} with ${values.length - 1} rows`);
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: id,
-        range: 'stocks_coefs!A1',
-        valueInputOption: 'RAW', //RAW или 'USER_ENTERED' если нужны форматы
-        requestBody: { values },
-      });
+      try {
+        console.info(`Updating sheet ${id} with ${rows.length} rows`);
+
+        // Запись данных
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: id,
+          range: 'stocks_coefs!A1',
+          valueInputOption: 'RAW',
+          requestBody: { values },
+        });
+
+        // Получаем сведения о листах, чтобы найти листId листа «stocks_coefs»
+        const meta = await sheets.spreadsheets.get({
+          spreadsheetId: id,
+        });
+
+        const sheet = meta.data.sheets?.find((s) => s.properties?.title === 'stocks_coefs');
+        if (!sheet || sheet.properties?.sheetId === undefined) {
+          console.warn(`Sheet "stocks_coefs" not found in spreadsheet ${id}. Skipping auto-resize.`);
+          continue;
+        }
+
+        const sheetId = sheet.properties.sheetId;
+
+        // Автоматическая подгонка колонок
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: id,
+          requestBody: {
+            requests: [
+              {
+                autoResizeDimensions: {
+                  dimensions: {
+                    sheetId: sheetId,
+                    dimension: 'COLUMNS',
+                    startIndex: 0,
+                    endIndex: header.length,
+                  },
+                },
+              },
+            ],
+          },
+        });
+        console.info(`Auto-resize columns completed for sheetId ${sheetId} in spreadsheet ${id}`);
+      } catch (err) {
+        console.error(`Error updating spreadsheet ${id}: ${(err as Error).message}`);
+        // Можно продолжать на следующий ID или прерывать в зависимости от политики
+      }
     }
   }
 }

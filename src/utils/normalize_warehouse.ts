@@ -1,16 +1,13 @@
 import { ApiResponse, Warehouse } from "#BoxTariffs/types/types.js";
+import toNumber from "./toNumber.js";
 
-function toNumber(value: unknown): number | null {
-  if (value == null) return null;
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") {
-    const cleaned = value.replace(/\u00A0/g, "").replace(/\s+/g, "").replace(",", ".");
-    const n = parseFloat(cleaned);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
 
+
+/**
+ * Преобразует данные ответа API по складам в массив объектов "Warehouse", приводя числовые поля к "number".
+ * @param apiResponse Ответ метода API Wildberries с тарифами по складам.
+ * @returns Массив нормализованных складов с актуальной датой и числовыми тарифами.
+ */
 export async function normalise_warehouse_data(apiResponse: ApiResponse): Promise<Warehouse[]> {
   const { dtNextBox, dtTillMax, warehouseList } = apiResponse.response.data;
   const today = new Date().toISOString().slice(0, 10);
