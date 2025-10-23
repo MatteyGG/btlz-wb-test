@@ -1,7 +1,7 @@
 export async function notify_Error(title: string, details: Record<string, any> = {}) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return; // без конфигов — тихо выходим
+  if (!token || !chatId) return; // без конфигов - не отправляем
 
   const text =
     `❌ *${escape(title)}*\n` +

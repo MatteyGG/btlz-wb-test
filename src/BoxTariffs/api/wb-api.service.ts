@@ -1,19 +1,12 @@
 import { ApiResponse } from "#BoxTariffs/types/types.js";
 
 /**
- * WbApiService wraps calls to the Wildberries box tariffs endpoint.  A date
- * parameter is required by the API in YYYY‑MM‑DD format; the default
- * implementation uses the supplied `now` function to generate the current
- * date.  A bearer token must be provided via the `WB_API_TOKEN`
- * environment variable.
+ * Сервис WbApiService обращается к эндпоинту тарифов коробов Wildberries.
+ * API требует обязательного параметра date в формате ГГГГ-ММ-ДД; реализация по умолчанию
+ * использует переданную функцию "now" для получения текущей даты.
+ * Токен (bearer token) должен быть предоставлен через переменную окружения `WB_API_TOKEN`.
  */
 export class WbApiService {
-  /**
-   * Fetch tariffs for a given day.  The `now` function defaults to
-   * `Date.now`, allowing callers to override the clock (useful in tests).
-   *
-   * @param now A function returning the current timestamp in milliseconds.
-   */
   async fetchTariffs(now: () => number = Date.now): Promise<ApiResponse> {
     const date = new Date(now()).toISOString().slice(0, 10);
     const url = `https://common-api.wildberries.ru/api/v1/tariffs/box?date=${date}`;

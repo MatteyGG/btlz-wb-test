@@ -1,5 +1,7 @@
 import { notify_Error } from "./telegram-notify.js";
 
+//TODO:Упростить или улучшить читаемость
+
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export type RequestCfg = {
@@ -43,27 +45,23 @@ export async function request<T = unknown>(cfg: RequestCfg): Promise<T> {
       const res = await fetch(url, { method, headers, body, signal: ctrl.signal });
       clearTimeout(timer);
 
-      // успех → пытаемся распарсить JSON, иначе возвращаем undefined
+      // пытаемся распарсить JSON, иначе возвращаем undefined
       if (res.ok) return parseJsonResponse<T>(res);
 
-      // 429 — ждём Retry-After (если есть), иначе обычный бэкофф, и пробуем снова
+      // 429 ждём Retry-After (если есть), иначе обычный бэкофф, и пробуем снова
       if (res.status === 429 && attempt < maxAttempts) {
         const ra = parseRetryAfter(res.headers.get("retry-after"));
         await sleep(ra ?? nextDelay(attempt, baseDelayMs, maxDelayMs));
         continue;
       }
 
-      // 5xx — ретрай по бэкоффу
       if (res.status >= 500 && res.status < 600 && attempt < maxAttempts) {
         await sleep(nextDelay(attempt, baseDelayMs, maxDelayMs));
         continue;
       }
-
-      // неуспех без ретрая
       const bodyText = await safeText(res);
       const error = new Error(`HTTP ${res.status} ${method} ${url} :: ${short(bodyText)}`);
       if (attempt === maxAttempts) {
-        // уведомим и бросим
         await notify_Error("HTTP request failed", { url, method, status: res.status, attempt, body: short(bodyText) });
       }
       throw error;
@@ -71,24 +69,20 @@ export async function request<T = unknown>(cfg: RequestCfg): Promise<T> {
     } catch (e: any) {
       clearTimeout(timer);
 
-      // таймаут → ретрай (кроме последней)
       if (e?.name === "AbortError") {
         if (attempt < maxAttempts) { await sleep(nextDelay(attempt, baseDelayMs, maxDelayMs)); continue; }
         await notify_Error("HTTP timeout", { url, method, attempt });
         throw new Error(`Timeout ${method} ${url}`);
       }
 
-      // остальное — сразу наружу
       throw e;
     }
   }
-
-  // теоретически не дойдём
   await notify_Error("HTTP exhausted", { url: cfg.url, method });
   throw new Error(`Exhausted attempts for ${method} ${cfg.url}`);
 }
 
-// ---- helpers
+//  helpers
 
 function buildUrl(base: string | undefined, path: string, params?: Record<string, any>) {
   const u = new URL(path, base || undefined);

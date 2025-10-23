@@ -2,6 +2,8 @@ import dotenv from "dotenv";
 import { z } from "zod";
 dotenv.config();
 
+//TODO: Пропустить через валидатор остальные перменные окружения
+
 const envSchema = z.object({
     NODE_ENV: z.union([z.undefined(), z.enum(["development", "production"])]),
     POSTGRES_HOST: z.union([z.undefined(), z.string()]),

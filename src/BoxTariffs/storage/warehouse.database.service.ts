@@ -2,19 +2,17 @@ import { Warehouse } from "#BoxTariffs/types/types.js";
 import knex from "#postgres/knex.js";
 
 /**
- * WarehouseStorageService persists tariff data into PostgreSQL and
- * exposes methods for retrieving the latest snapshot for a given day.
- * Data is stored in the `warehouse_rates` table; see the migration
- * file in `migrations/` for details.  Inserts use
- * `onConflict(...).merge()` to implement upsert semantics【11089416715722†L934-L940】.
+ * Сервис WarehouseStorageService сохраняет данные о тарифах в PostgreSQL и
+ * предоставляет методы для получения последнего snapshot'a данных за указанный день.
+ * Данные хранятся в таблице `warehouse_rates`.
  */
 export class WarehouseStorageService {
   /**
-   * Insert or update a list of warehouses.  For each entry the
-   * combination of `date` and `warehouse_name` must be unique.  If a
-   * conflict is detected the existing row is updated with the new
-   * values.  This method runs insert/merge sequentially for
-   * simplicity; it could be batched for better performance.
+   * Вставляет или обновляет список складов / warehouses. Для каждой записи комбинация
+   * `date` и `warehouse_name` должна быть уникальной. При обнаружении конфликта
+   * существующая строка обновляется новыми значениями. Метод выполняет
+   * вставку/объединение последовательно для простоты; можно группировать
+   * для повышения производительности.
    */
   async save_warehouses(warehouses: Warehouse[]): Promise<void> {
     for (const warehouse of warehouses) {
@@ -42,9 +40,8 @@ export class WarehouseStorageService {
   }
 
   /**
-   * Retrieve all warehouse rates for the current day (today) sorted by
-   * coefficient ascending.  Consumers can pass an explicit date
-   * parameter to fetch a different day (ISO date string).
+   * Получает все тарифы складов за текущий день (сегодня) с сортировкой по
+   * коэффициенту по возрастанию. Возможно передать date.
    */
   async get_latest_warehouses(date?: string): Promise<Warehouse[]> {
     const targetDate = date || new Date().toISOString().slice(0, 10);
