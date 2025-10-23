@@ -1,27 +1,33 @@
-import { Warehouse } from "#BoxTariffs/types/types.js";
-import { response } from "express";
+import { ApiResponse } from "#BoxTariffs/types/types.js";
 
-export interface ApiResponse {
-    response: {
-        data: {
-            dtNextBox: string;
-            dtTillMax: string;
-            warehouseList: Warehouse[];
-        }
-    }
-}
-
-export async function fetchWB() {
-    const response = await fetch("https://common-api.wildberries.ru/api/v1/tariffs/box?date=2025-10-23", {
-        method: "GET",
-        headers: {
-            "Accept": "application/json",
-            "Authorization": `Bearer ${process.env.WB_API_TOKEN}`,
-        },
+/**
+ * WbApiService wraps calls to the Wildberries box tariffs endpoint.  A date
+ * parameter is required by the API in YYYY‑MM‑DD format; the default
+ * implementation uses the supplied `now` function to generate the current
+ * date.  A bearer token must be provided via the `WB_API_TOKEN`
+ * environment variable.
+ */
+export class WbApiService {
+  /**
+   * Fetch tariffs for a given day.  The `now` function defaults to
+   * `Date.now`, allowing callers to override the clock (useful in tests).
+   *
+   * @param now A function returning the current timestamp in milliseconds.
+   */
+  async fetchTariffs(now: () => number = Date.now): Promise<ApiResponse> {
+    const date = new Date(now()).toISOString().slice(0, 10);
+    const url = `https://common-api.wildberries.ru/api/v1/tariffs/box?date=${date}`;
+    const token = process.env.WB_API_TOKEN;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: token ? `Bearer ${token}` : '',
+      },
     });
-
-     const data = await response.json();
-
-    return data;
+    if (!response.ok) {
+      throw new Error(`WB API error: ${response.status}`);
+    }
+    return (await response.json()) as ApiResponse;
+  }
 }
-
