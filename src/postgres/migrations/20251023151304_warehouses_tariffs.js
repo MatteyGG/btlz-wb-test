@@ -3,13 +3,11 @@
  * @returns {Promise<void>}
  */
 export async function up(knex) {
-    await knex.schema.createTable("warehouse_rates", (table) => {
+    await knex.schema.createTable("warehouse_tariffs", (table) => {
         table.increments("id").primary();
         table.date("date").notNullable();
         table.string("warehouse_name").notNullable();
         table.string("geo_name");
-        table.string("dt_next_box");
-        table.string("dt_till_max");
         table.decimal("box_delivery_base");
         table.decimal("box_delivery_coef_expr");
         table.decimal("box_delivery_liter");

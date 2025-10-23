@@ -13,11 +13,11 @@ const tariffsModule = new TariffsModule();
 
 async function runSync(): Promise<void> {
   try {
-    const result = await tariffsModule.syncAllData();
+    const result = await tariffsModule.get_and_update_tariffs();
     console.log(result.message);
   } catch (err) {
     console.error('Sync failed', err);
   }
 }
-//Пока запускаем незамедлительно
+//Пока запускаем незамедлительно TODO: К
 runSync().catch((err) => notify_Error('Initial sync error', { error: err?.message || String(err) }));

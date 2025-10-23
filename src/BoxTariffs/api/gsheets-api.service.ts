@@ -1,14 +1,8 @@
-// GsheetsApiService.ts
 import { Warehouse } from '#BoxTariffs/types/types.js';
+import { GoogleAuth } from 'google-auth-library';
+import { JSONClient } from 'google-auth-library/build/src/auth/googleauth.js';
 import { google, sheets_v4 } from 'googleapis';
 
-/**
- * Доступ к Google Sheets через сервис-аккаунт.
- * Требуются переменные окружения:
- *  - GOOGLE_CLIENT_EMAIL
- *  - GOOGLE_PRIVATE_KEY  (c \n или в base64)
- *  - GSHEETS_IDS         (через запятую)
- */
 export class GsheetsApiService {
   private sheetsClient: sheets_v4.Sheets | null = null;
 
@@ -22,21 +16,17 @@ export class GsheetsApiService {
       throw new Error('Missing GOOGLE_CLIENT_EMAIL or GOOGLE_PRIVATE_KEY in environment');
     }
 
-    // Поддержка двух распространённых форматов хранения ключа:
-    // 1) со строковыми "\n"; 2) base64-кодированный JSON-ключ.
+    // Поддержка base64-ключа
     try {
-      // Если переменная выглядит как base64 — попробуем декодировать.
       if (/^[A-Za-z0-9+/=]+\s*$/.test(privateKey) && !privateKey.includes('BEGIN PRIVATE KEY')) {
         const decoded = Buffer.from(privateKey, 'base64').toString('utf8');
-        // Если после декодирования там действительно PEM — используем его.
         if (decoded.includes('BEGIN PRIVATE KEY')) {
           privateKey = decoded;
         }
       }
     } catch {
-      // игнорируем и продолжаем со строкой как есть
+      // игнорируем ошибку декодирования
     }
-    // Если остались экранированные \n — превращаем в реальные переводы строки.
     privateKey = privateKey.replace(/\\n/g, '\n');
 
     const auth = new google.auth.GoogleAuth({
@@ -47,8 +37,34 @@ export class GsheetsApiService {
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
 
+    // Проверка успешной аутентификации
+    await this.verifyAuth(auth);
+
     this.sheetsClient = google.sheets({ version: 'v4', auth });
     return this.sheetsClient;
+  }
+
+  private async verifyAuth(auth: GoogleAuth<JSONClient>): Promise<void> {
+    try {
+      const client = await auth.getClient();
+      const tokenInfo = await client.getAccessToken();
+      if (!tokenInfo || !tokenInfo.token) {
+        throw new Error('Failed to obtain access token');
+      }
+      // Выводим лог, что аутентификация прошла
+      console.info('Google Sheets API auth successful');
+    } catch (err) {
+      throw new Error(`Google authentication failed: ${(err as Error).message}`);
+    }
+  }
+
+  private formatDate(iso: string): string {
+    const d = new Date(iso);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}:${hh}`;
   }
 
   /**
@@ -70,29 +86,25 @@ export class GsheetsApiService {
       return;
     }
 
-    // Сортировка по коэффициенту
     const sorted = [...warehouses].sort((a, b) => a.boxDeliveryCoefExpr - b.boxDeliveryCoefExpr);
 
-    // Заголовки и строки
     const header = [
-      'date',
-      'warehouseName',
-      'geoName',
-      'boxDeliveryBase',
-      'boxDeliveryCoefExpr',
-      'boxDeliveryLiter',
-      'boxDeliveryMarketplaceBase',
-      'boxDeliveryMarketplaceCoefExpr',
-      'boxDeliveryMarketplaceLiter',
-      'boxStorageBase',
-      'boxStorageCoefExpr',
-      'boxStorageLiter',
-      'dtNextBox',
-      'dtTillMax',
+      'Дата (YYYY-MM-DD:HH) snapshot',
+      'Название склада',
+      'Страна, для РФ — округ',
+      'Логистика, первый литр, ₽',
+      'Коэффициент Логистика, %. На него умножается стоимость логистики. Уже учтён в тарифах',
+      'Логистика, дополнительный литр, ₽',
+      'Логистика FBS, первый литр, ₽',
+      'Коэффициент FBS, %.',
+      'Логистика FBS, дополнительный литр, ₽',
+      'Хранение в день, первый литр, ₽',
+      'Коэффициент Хранение, %.',
+      'Хранение в день, дополнительный литр, ₽',
     ] as const;
 
     const rows = sorted.map((w) => [
-      w.date,
+      this.formatDate(w.date),
       w.warehouseName,
       w.geoName,
       w.boxDeliveryBase,
@@ -104,18 +116,16 @@ export class GsheetsApiService {
       w.boxStorageBase,
       w.boxStorageCoefExpr,
       w.boxStorageLiter,
-      w.dtNextBox,
-      w.dtTillMax,
     ]);
 
     const values = [header as unknown as string[], ...rows];
 
-    // Записываем во все указанные таблицы
     for (const id of spreadsheetIds) {
+      console.info(`Updating sheet ${id} with ${values.length - 1} rows`);
       await sheets.spreadsheets.values.update({
         spreadsheetId: id,
         range: 'stocks_coefs!A1',
-        valueInputOption: 'RAW',
+        valueInputOption: 'RAW', //RAW или 'USER_ENTERED' если нужны форматы
         requestBody: { values },
       });
     }

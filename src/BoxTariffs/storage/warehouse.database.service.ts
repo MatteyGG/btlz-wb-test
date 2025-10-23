@@ -20,8 +20,6 @@ export class WarehouseStorageService {
         date: warehouse.date,
         warehouse_name: warehouse.warehouseName,
         geo_name: warehouse.geoName,
-        dt_next_box: warehouse.dtNextBox,
-        dt_till_max: warehouse.dtTillMax,
         box_delivery_base: warehouse.boxDeliveryBase,
         box_delivery_coef_expr: warehouse.boxDeliveryCoefExpr,
         box_delivery_liter: warehouse.boxDeliveryLiter,

@@ -1,19 +1,33 @@
 export interface ApiResponse {
   response: {
     data: {
+      /** Дата начала следующего тарифа  */
       dtNextBox: string;
+      /** Дата окончания последнего установленного тарифа */
       dtTillMax: string;
+      /** Тарифы для коробов, сгруппированные по складам */
       warehouseList: Array<{
+        /** Название склада */
         warehouseName: string;
+        /** Страна, для РФ — округ */
         geoName: string;
+        /** Логистика, первый литр, ₽ */
         boxDeliveryBase: string;
+        /** Коэффициент Логистика, %. На него умножается стоимость логистики. Уже учтён в тарифах  */
         boxDeliveryCoefExpr: string;
+        /** Логистика, дополнительный литр, ₽ */
         boxDeliveryLiter: string;
+        /** Логистика FBS, первый литр, ₽  */
         boxDeliveryMarketplaceBase: string;
+        /** Коэффициент FBS, %. На него умножается стоимость логистики FBS. Уже учтён в тарифах */
         boxDeliveryMarketplaceCoefExpr: string;
+        /** Логистика FBS, дополнительный литр, ₽  */
         boxDeliveryMarketplaceLiter: string;
+        /** Хранение в день, первый литр, ₽ */
         boxStorageBase: string;
+        /** Коэффициент Хранение, %. На него умножается стоимость хранения в день. Уже учтён в тарифах  */
         boxStorageCoefExpr: string;
+        /** Хранение в день, дополнительный литр, ₽ */
         boxStorageLiter: string;
       }>;
     };
@@ -21,32 +35,28 @@ export interface ApiResponse {
 }
 
 export interface Warehouse {
-  /** Date (YYYY‑MM‑DD) for which the rates apply */
+  /** Дата (YYYY‑MM‑DD) snapshot'a */
   date: string;
-  /** Name of the warehouse */
+  /** Название склада */
   warehouseName: string;
-  /** Geographic region or country (e.g. "Центральный федеральный округ") */
+  /** Страна, для РФ — округ */
   geoName: string;
-  /** Date of the next tariff box change */
-  dtNextBox: string;
-  /** Date of the last tariff box change */
-  dtTillMax: string;
-  /** Logistics – first litre cost (₽) */
+   /** Логистика, первый литр, ₽ */
   boxDeliveryBase: number;
-  /** Logistics – coefficient (%) */
+   /** Коэффициент Логистика, %. На него умножается стоимость логистики. Уже учтён в тарифах  */
   boxDeliveryCoefExpr: number;
-  /** Logistics – additional litre cost (₽) */
+  /** Логистика, дополнительный литр, ₽ */
   boxDeliveryLiter: number;
-  /** Logistics FBS – first litre cost (₽) */
+ /** Логистика FBS, первый литр, ₽  */
   boxDeliveryMarketplaceBase: number;
-  /** Logistics FBS – coefficient (%) */
+  /** Коэффициент FBS, %. На него умножается стоимость логистики FBS. Уже учтён в тарифах */
   boxDeliveryMarketplaceCoefExpr: number;
-  /** Logistics FBS – additional litre cost (₽) */
+  /** Логистика FBS, дополнительный литр, ₽ */
   boxDeliveryMarketplaceLiter: number;
-  /** Storage – first litre cost per day (₽) */
+  /** Хранение в день, первый литр, ₽*/
   boxStorageBase: number;
-  /** Storage – coefficient (%) */
+  /** Коэффициент Хранение, %. На него умножается стоимость хранения в день. Уже учтён в тарифах */
   boxStorageCoefExpr: number;
-  /** Storage – additional litre cost per day (₽) */
+  /** Хранение в день, дополнительный литр, ₽ */
   boxStorageLiter: number;
 }
