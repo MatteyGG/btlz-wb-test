@@ -42,7 +42,9 @@
    TELEGRAM_CHAT_ID= # Можно оставить пустым, если не используете
    ```
 
-   📘 Подробнее о получении Google-ключей и ID таблиц: [Google Sheets API Quickstart](https://developers.google.com/sheets/api/quickstart)
+   
+- [Настройка переменных для  Google Sheets API](README-google-sheets.md)  
+- [Настройка переменных для Telegram-бота](README-telegram.md)
 
 4. Запустите с помощью Docker:
    ```bash
