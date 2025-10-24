@@ -3,7 +3,7 @@
  * @returns {Promise<void>}
  */
 export async function up(knex) {
-    await knex.schema.createTable("warehouse_tariffs", (table) => {
+    await knex.schema.createTable("warehouse_rates", (table) => {
         table.increments("id").primary();
         table.date("date").notNullable();
         table.string("warehouse_name").notNullable();
