@@ -15,9 +15,6 @@
  * @param {string | number} [errorCode] - Код ошибки или статус, необязателен.
  * @param {string} [description] - Текст описания или пояснение.
  * @returns {Promise<void>} Возвращает промис без значения. В случае ошибки логирует статус и ответ Telegram.
- *
- * @example
- * await telegram_notify("Ошибка оплаты", 502, "Stripe вернул 5xx при создании PaymentIntent");
  */
 export async function telegram_notify(
   title: string,
