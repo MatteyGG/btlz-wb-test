@@ -17,43 +17,75 @@
 - Telegram-уведомления об ошибках.
 - Поддержка расширения под другие хранилища.
 
-Quick start
-Скопируйте проект с github
+## 🚀 Быстрый старт
 
-example.env содержит набор необходимых перменных окружения для работы проекта. 
-cp example.env .env
-Внесите WB_API_TOKEN 
+1. Клонируйте репозиторий:
+   ```bash
+   git clone https://github.com/MatteyGG/btlz-wb-test
+   cd btlz-wb-test
+   ```
+
+2. Скопируйте и настройте переменные окружения:
+   ```bash
+   cp example.env .env
+   ```
+
+3. Заполните `.env`:
+   ```env
+   WB_API_TOKEN=ваш_токен_WB
+
+   GOOGLE_CLIENT_EMAIL=xxxx@iam.gserviceaccount.com
+   GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+   GSHEETS_IDS=sheet_id_1,sheet_id_2
+
+   TELEGRAM_BOT_TOKEN= # Можно оставить пустым, если не используете
+   TELEGRAM_CHAT_ID= # Можно оставить пустым, если не используете
+   ```
+
+   📘 Подробнее о получении Google-ключей и ID таблиц: [Google Sheets API Quickstart](https://developers.google.com/sheets/api/quickstart)
+
+4. Запустите с помощью Docker:
+   ```bash
+   docker compose up --build -d
+   ```
+
+5. Проверьте логи:
+   ```bash
+   docker compose logs
+   ```
+
+---
 
 
-GOOGLE_CLIENT_EMAIL= .iam.gserviceaccount.com
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n\n-----END PRIVATE KEY-----\n"
-#ID Google таблиц разделять запятой 
-GSHEETS_IDS=
-Ссылка на раздел с получением GOOGLE_CLIENT_EMAIL и GOOGLE_PRIVATE_KEY и GSHEETS_IDS
+## 📦 Используемые пакеты
 
-# Telegram
-TELEGRAM_BOT_TOKEN= #Можно оставить пустым
-TELEGRAM_CHAT_ID=-1002516011692 #Начинается с -100
+- **knex** — работа с PostgreSQL  
+- **googleapis** — взаимодействие с Google Sheets  
+- **node-cron** — планирование задач  
+- **zod** — валидация переменных окружения  
 
-Запустите compose.yaml командой 
-docker compose up --build -d
+## ⚙️ Логика работы
 
-Можете просмотреть логи 
-docker compose logs
+- В `app.ts` запускаются cron-задачи:
+  - `get_and_update_database` — получает данные из Wildberries API и сохраняет их в базу.
+  - `get_and_update_gsheet` — читает данные из базы и обновляет Google Sheets.
+- Ключевые сервисы:
+  - `wb-api.service.ts` — работа с API Wildberries.
+  - `warehouse.database.service.ts` — взаимодействие с PostgreSQL.
+  - `gsheets-api.service.ts` — обновление Google Sheets.
+  - `telegram_notify` — уведомления об ошибках через Telegram.
+- Оркестрация задач реализована в `tariffs.module.ts`.
 
-Пакеты, используемые в проекте:
-knex - Для работы с postgreSql
-googleapis - Для работы с Google sheets
-node-cron - Для обновления данных по расписанию 
-zod - Для валидации перменных
+---
 
-Логика сервиса:
-- В app.ts мы настраиваем schedule для двух задач:
- - Обновить и сохранить данные в storage(PostgreSql) wb-api.service.ts и warehouse.database.service.ts
- - Прочитать данные из storage и обновить Google sheets  warehouse.database.service.ts и gsheets-api.service.ts
-Оркестратором выступает tariffs.module.ts, в нем описаны процессы get_and_update_database и get_and_update_gsheet, которые мы триггерим в cron
+## 🧪 Разработка и тестирование
 
+Для запуска локально без Docker:
+```bash
+npm install
+npm run dev
+```
 
-
+## 🪪 Лицензия
 
 MIT License — свободно используйте, модифицируйте и распространяйте.
