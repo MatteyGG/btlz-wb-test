@@ -69,8 +69,7 @@ export class GsheetsApiService {
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}:${hh}`;
+    return `${yyyy}-${mm}-${dd}`;
   }
 
   /**
@@ -106,7 +105,7 @@ export class GsheetsApiService {
     });
 
     const header = [
-      'Дата (YYYY-MM-DD:HH) snapshot',
+      'Дата (YYYY-MM-DD) snapshot',
       'Название склада',
       'Страна, для РФ — округ',
       'Логистика, первый литр, ₽',
