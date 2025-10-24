@@ -15,6 +15,9 @@
  * @param {string | number} [errorCode] - Код ошибки или статус, необязателен.
  * @param {string} [description] - Текст описания или пояснение.
  * @returns {Promise<void>} Возвращает промис без значения. В случае ошибки логирует статус и ответ Telegram.
+ *
+ * @example
+ * await telegram_notify('WB API: отсутствует токен');
  */
 export async function telegram_notify(
   title: string,
