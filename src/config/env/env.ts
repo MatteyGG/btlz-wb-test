@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import cron from 'node-cron';
 import { z } from "zod";
 dotenv.config();
 
@@ -23,27 +24,42 @@ const envSchema = z.object({
     ]),
     WB_API_TOKEN: z.string().nonempty(),
     GSHEET_SORT_KEY: z
-    .string()
-    .nonempty()
-    .refine((val) => {
-      const allowed = [
-        "boxDeliveryCoefExpr",
-        "boxDeliveryBase",
-        "boxDeliveryLiter",
-        "boxDeliveryMarketplaceCoefExpr",
-        "boxDeliveryMarketplaceBase",
-        "boxDeliveryMarketplaceLiter",
-        "boxStorageCoefExpr",
-        "boxStorageBase",
-        "boxStorageLiter",
-        "date",
-        "warehouseName",
-        "geoName"
-      ] as const;
-      return allowed.includes(val as any);
-    }, {
-      message: "GSHEET_SORT_KEY must be one of the allowed Warehouse keys"
-    })
+        .string()
+        .nonempty()
+        .refine(
+            (val) => {
+                const allowed = [
+                    "boxDeliveryCoefExpr",
+                    "boxDeliveryBase",
+                    "boxDeliveryLiter",
+                    "boxDeliveryMarketplaceCoefExpr",
+                    "boxDeliveryMarketplaceBase",
+                    "boxDeliveryMarketplaceLiter",
+                    "boxStorageCoefExpr",
+                    "boxStorageBase",
+                    "boxStorageLiter",
+                    "date",
+                    "warehouseName",
+                    "geoName",
+                ] as const;
+                return allowed.includes(val as any);
+            },
+            {
+                message: "GSHEET_SORT_KEY must be one of the allowed Warehouse keys",
+            },
+        ),
+    CRON_DATABASE_SYNC: z
+        .string()
+        .nonempty()
+        .refine((expression) => cron.validate(expression), {
+            message: "CRON_DATABASE_SYNC must be a valid cron expression",
+        }),
+    CRON_SHEET_SYNC: z
+        .string()
+        .nonempty()
+        .refine((expression) => cron.validate(expression), {
+            message: "CRON_SHEET_SYNC must be a valid cron expression",
+        }),
 });
 
 const env = envSchema.parse({
@@ -55,7 +71,9 @@ const env = envSchema.parse({
     NODE_ENV: process.env.NODE_ENV,
     APP_PORT: process.env.APP_PORT,
     WB_API_TOKEN: process.env.WB_API_TOKEN,
-    GSHEET_SORT_KEY: process.env.GSHEET_SORT_KEY
+    GSHEET_SORT_KEY: process.env.GSHEET_SORT_KEY,
+    CRON_DATABASE_SYNC: process.env.CRON_DATABASE_SYNC,
+    CRON_SHEET_SYNC: process.env.CRON_SHEET_SYNC,
 });
 
 export default env;

@@ -1,123 +1,99 @@
-import { notify_Error } from "./telegram-notify.js";
+// lib/http.ts
 
-//TODO:Упростить или улучшить читаемость
+type Json = Record<string, unknown>;
 
-type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-
-export type RequestCfg = {
-  url: string;
-  baseURL?: string;
-  method?: HttpMethod;
-  headers?: Record<string, string>;
-  params?: Record<string, string | number | boolean | undefined>;
-  body?: unknown;
-  timeoutMs?: number;            // таймаут одной попытки (по желанию)
-  maxAttempts?: number;          // сколько всего попыток (вкл. первую)
-  baseDelayMs?: number;          // старт бэкоффа
-  maxDelayMs?: number;           // кап бэкоффа
+export type HttpErrorBody = {
+  title?: string;
+  detail?: string;
+  status?: number;
+  statusText?: string;
+  code?: string;
+  requestId?: string;
+  origin?: string;
+  timestamp?: string;
+  [k: string]: unknown;
 };
 
-const DEF = {
-  timeoutMs: parseInt(process.env.FETCH_TIMEOUT_MS || "8000", 10),
-  maxAttempts: parseInt(process.env.RETRY_MAX_ATTEMPTS || "4", 10),
-  baseDelayMs: parseInt(process.env.RETRY_BASE_DELAY_MS || "300", 10),
-  maxDelayMs: parseInt(process.env.RETRY_MAX_DELAY_MS || "4000", 10),
+export class HttpError extends Error {
+  readonly status: number;
+  readonly statusText: string;
+  readonly body?: HttpErrorBody;
+
+  constructor(status: number, statusText: string, body?: HttpErrorBody) {
+    super(`HTTP ${status} ${statusText}${body?.detail ? ` — ${body.detail}` : ''}`);
+    this.name = 'HttpError';
+    this.status = status;
+    this.statusText = statusText;
+    this.body = body;
+  }
+}
+
+export type RetryOptions = {
+  /** Макс. попыток (включая первую). */
+  attempts?: number;
+  /** Базовая задержка (мс) для backoff. */
+  baseDelayMs?: number;
+  /** Верхняя граница задержки (мс). */
+  maxDelayMs?: number;
 };
 
-export async function request<T = unknown>(cfg: RequestCfg): Promise<T> {
-  const {
-    timeoutMs = DEF.timeoutMs,
-    maxAttempts = DEF.maxAttempts,
-    baseDelayMs = DEF.baseDelayMs,
-    maxDelayMs = DEF.maxDelayMs,
-  } = cfg;
+// Загружаем дефолтные значения из env, если есть
+const ENV_RETRY: Required<RetryOptions> = {
+  attempts: Number(process.env.RETRY_MAX_ATTEMPTS) || 3,
+  baseDelayMs: Number(process.env.RETRY_BASE_DELAY_MS) || 400,
+  maxDelayMs: Number(process.env.RETRY_MAX_DELAY_MS) || 4000,
+};
 
-  const method = (cfg.method || "GET").toUpperCase() as HttpMethod;
-  const url = buildUrl(cfg.baseURL, cfg.url, cfg.params);
-  const headers: Record<string, string> = { Accept: "application/json", ...(cfg.headers || {}) };
-  const body = serializeBody(cfg.body, headers);
+/**
+ * Простой fetch с ретраями только для 429 (Too Many Requests).
+ * Уважает заголовок `Retry-After` (секунды).
+ *
+ * Настройки по умолчанию читаются из env:
+ * - RETRY_MAX_ATTEMPTS
+ * - RETRY_BASE_DELAY_MS
+ * - RETRY_MAX_DELAY_MS
+ *
+ * @template T Тип ожидаемого JSON.
+ * @throws {HttpError} для неуспешных ответов (кроме повторяемых 429).
+ */
+export async function fetchWithRetry<T = Json>(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  retry: RetryOptions = {},
+): Promise<T> {
+  const attempts = Math.max(1, retry.attempts ?? ENV_RETRY.attempts);
+  const baseDelay = retry.baseDelayMs ?? ENV_RETRY.baseDelayMs;
+  const maxDelay = retry.maxDelayMs ?? ENV_RETRY.maxDelayMs;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  for (let i = 1; i <= attempts; i++) {
+    const res = await fetch(input, init);
 
-    try {
-      const res = await fetch(url, { method, headers, body, signal: ctrl.signal });
-      clearTimeout(timer);
-
-      // пытаемся распарсить JSON, иначе возвращаем undefined
-      if (res.ok) return parseJsonResponse<T>(res);
-
-      // 429 ждём Retry-After (если есть), иначе обычный бэкофф, и пробуем снова
-      if (res.status === 429 && attempt < maxAttempts) {
-        const ra = parseRetryAfter(res.headers.get("retry-after"));
-        await sleep(ra ?? nextDelay(attempt, baseDelayMs, maxDelayMs));
-        continue;
+    if (res.ok) {
+      if (res.status === 204) return undefined as unknown as T;
+      try {
+        return (await res.json()) as T;
+      } catch {
+        return {} as T;
       }
-
-      if (res.status >= 500 && res.status < 600 && attempt < maxAttempts) {
-        await sleep(nextDelay(attempt, baseDelayMs, maxDelayMs));
-        continue;
-      }
-      const bodyText = await safeText(res);
-      const error = new Error(`HTTP ${res.status} ${method} ${url} :: ${short(bodyText)}`);
-      if (attempt === maxAttempts) {
-        await notify_Error("HTTP request failed", { url, method, status: res.status, attempt, body: short(bodyText) });
-      }
-      throw error;
-
-    } catch (e: any) {
-      clearTimeout(timer);
-
-      if (e?.name === "AbortError") {
-        if (attempt < maxAttempts) { await sleep(nextDelay(attempt, baseDelayMs, maxDelayMs)); continue; }
-        await notify_Error("HTTP timeout", { url, method, attempt });
-        throw new Error(`Timeout ${method} ${url}`);
-      }
-
-      throw e;
     }
+
+    let body: HttpErrorBody | undefined;
+    try {
+      body = (await res.json()) as HttpErrorBody;
+    } catch {/* ignore */}
+
+    if (res.status === 429 && i < attempts) {
+      const retryAfter = res.headers.get('retry-after');
+      const retryAfterMs = retryAfter ? Number(retryAfter) * 1000 : NaN;
+      const backoff = Math.min(maxDelay, baseDelay * 2 ** (i - 1));
+      const jitter = Math.random() * (backoff * 0.25);
+      const delay = Number.isFinite(retryAfterMs) ? retryAfterMs : Math.round(backoff + jitter);
+      await new Promise((r) => setTimeout(r, delay));
+      continue;
+    }
+
+    throw new HttpError(res.status, res.statusText, body);
   }
-  await notify_Error("HTTP exhausted", { url: cfg.url, method });
-  throw new Error(`Exhausted attempts for ${method} ${cfg.url}`);
+
+  throw new Error('fetchWithRetry exhausted without result');
 }
-
-//  helpers
-
-function buildUrl(base: string | undefined, path: string, params?: Record<string, any>) {
-  const u = new URL(path, base || undefined);
-  if (params) for (const [k, v] of Object.entries(params)) if (v != null) u.searchParams.set(k, String(v));
-  return u.toString();
-}
-
-function serializeBody(body: unknown, headers: Record<string, string>): BodyInit | undefined {
-  if (body == null) return undefined;
-  if (typeof body === "string" || body instanceof Blob || body instanceof ArrayBuffer || body instanceof FormData) {
-    return body as BodyInit;
-  }
-  if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
-  return JSON.stringify(body);
-}
-
-async function parseJsonResponse<T>(res: Response): Promise<T> {
-  const ct = res.headers.get("content-type") || "";
-  if (ct.includes("application/json")) return await res.json() as T;
-  return undefined as unknown as T;
-}
-
-function parseRetryAfter(raw: string | null): number | undefined {
-  if (!raw) return;
-  const sec = parseInt(raw, 10); if (!Number.isNaN(sec)) return sec * 1000;
-  const when = Date.parse(raw); const ms = when - Date.now(); return ms > 0 ? ms : undefined;
-}
-
-function nextDelay(attempt: number, base: number, cap: number) {
-  const exp = Math.min(base * Math.pow(2, attempt - 1), cap);
-  const jitter = Math.floor(Math.random() * (exp * 0.2)); // 0..20% для разведения
-  return exp - jitter;
-}
-
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-
-async function safeText(res: Response) { try { return await res.text(); } catch { return ""; } }
-function short(s: string, max = 500) { return s.length > max ? s.slice(0, max) + "…(trunc)" : s; }

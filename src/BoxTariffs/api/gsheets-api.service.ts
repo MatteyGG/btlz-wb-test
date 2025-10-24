@@ -1,10 +1,9 @@
 import { Warehouse } from '#BoxTariffs/types/types.js';
 import env from '#config/env/env.js';
+import { telegram_notify } from '#lib/telegram-notify.js';
 import { GoogleAuth } from 'google-auth-library';
 import { JSONClient } from 'google-auth-library/build/src/auth/googleauth.js';
 import { google, sheets_v4 } from 'googleapis';
-
-const SORT_KEY = 'boxDeliveryCoefExpr' satisfies keyof Warehouse;
 
 /**
  * Сервис для взаимодействия с Google Sheets API: авторизуется с сервисным аккаунтом и обновляет таблицы тарифов.
@@ -182,9 +181,14 @@ export class GsheetsApiService {
           },
         });
         console.info(`Auto-resize columns completed for sheetId ${sheetId} in spreadsheet ${id}`);
-      } catch (err) {
-        console.error(`Error updating spreadsheet ${id}: ${(err as Error).message}`);
-        // Можно продолжать на следующий ID или прерывать в зависимости от политики
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        await telegram_notify(
+          'Google Sheets update error',
+          undefined,
+          `Spreadsheet ID: ${id} — error: ${message}`
+        );
+        // Можно либо продолжать на следующий ID либо прерывать — взяты политики продолжения
       }
     }
   }
