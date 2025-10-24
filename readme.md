@@ -1,3 +1,4 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Docker Ready](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com) [![Node version](https://img.shields.io/badge/node->=20-green.svg)](https://nodejs.org)  [![Written in TypeScript](https://img.shields.io/badge/TypeScript-Yes-blue.svg)](https://www.typescriptlang.org)  [![wakatime](https://wakatime.com/badge/user/85043d71-6099-4bd2-af51-2c3525efd2b8/project/b356293d-93b1-4b80-a438-eccbc9653f15.svg)](https://wakatime.com/badge/user/85043d71-6099-4bd2-af51-2c3525efd2b8/project/b356293d-93b1-4b80-a438-eccbc9653f15)
 #  Тестовое задание от lucard17
 
 Сервис **«настроил и забыл»** для сбора данных из API Wildberries и сохранения их в PostgreSQL.  
